@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">PLC RFID Item Locater</string>
+    <string name="geiger_off">Geiger off</string>
+    <string name="geiger_on">Geiger on</string>
+    <string name="mute_label_text">Mute</string>
+    <string name="description_label_text">Description</string>
+    <string name="reads_label_text">Reads</string>
 </resources>

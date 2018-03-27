@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.porterlee.rfiditemlocater.InventoryActivity">
+
+    <Button
+        android:id="@+id/start_button"
+        style="@style/Base.Widget.AppCompat.ImageButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:text="@string/geiger_off"
+        android:background="@null"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <TextView
+        android:id="@+id/mute_column_label"
+        style="@style/Base.TextAppearance.AppCompat.Small"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:gravity="center_vertical"
+        android:text="@string/mute_label_text"
+        app:layout_constraintTop_toBottomOf="@+id/start_button"
+        app:layout_constraintBottom_toTopOf="@+id/target_recycler_view"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <TextView
+        android:id="@+id/description_column_label"
+        style="@style/Base.TextAppearance.AppCompat.Small"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:layout_marginStart="72dp"
+        android:text="@string/description_label_text"
+        app:layout_constraintTop_toTopOf="@id/mute_column_label"
+        app:layout_constraintBottom_toBottomOf="@id/mute_column_label"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/reads_label_text"
+        android:layout_marginEnd="14dp"
+        app:layout_constraintTop_toTopOf="@id/mute_column_label"
+        app:layout_constraintBottom_toBottomOf="@id/mute_column_label"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <android.support.v7.widget.RecyclerView
+        android:id="@+id/target_recycler_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        tools:listitem="@layout/rfid_item"
+        app:layout_constraintTop_toBottomOf="@+id/mute_column_label"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+</android.support.constraint.ConstraintLayout>
