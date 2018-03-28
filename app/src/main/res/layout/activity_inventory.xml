@@ -24,34 +24,33 @@
         style="@style/Base.TextAppearance.AppCompat.Small"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp"
         android:gravity="center_vertical"
         android:text="@string/mute_label_text"
         app:layout_constraintTop_toBottomOf="@+id/start_button"
         app:layout_constraintBottom_toTopOf="@+id/target_recycler_view"
-        app:layout_constraintStart_toStartOf="parent"/>
+        app:layout_constraintStart_toStartOf="@+id/checkbox_guide"
+        app:layout_constraintEnd_toEndOf="@+id/checkbox_guide"/>
 
     <TextView
         android:id="@+id/description_column_label"
         style="@style/Base.TextAppearance.AppCompat.Small"
         android:layout_width="wrap_content"
         android:layout_height="0dp"
-        android:layout_marginStart="72dp"
         android:text="@string/description_label_text"
-        app:layout_constraintTop_toTopOf="@id/mute_column_label"
-        app:layout_constraintBottom_toBottomOf="@id/mute_column_label"
-        app:layout_constraintStart_toStartOf="parent"/>
+        app:layout_constraintTop_toTopOf="@+id/mute_column_label"
+        app:layout_constraintBottom_toBottomOf="@+id/mute_column_label"
+        app:layout_constraintStart_toStartOf="@+id/description_guide"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/reads_label_text"
-        android:layout_marginEnd="14dp"
-        app:layout_constraintTop_toTopOf="@id/mute_column_label"
-        app:layout_constraintBottom_toBottomOf="@id/mute_column_label"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintTop_toTopOf="@+id/mute_column_label"
+        app:layout_constraintBottom_toBottomOf="@+id/mute_column_label"
+        app:layout_constraintStart_toStartOf="@id/reads_guide"
+        app:layout_constraintEnd_toEndOf="@id/reads_guide"/>
 
     <android.support.v7.widget.RecyclerView
         android:id="@+id/target_recycler_view"
@@ -62,5 +61,26 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"/>
+
+    <android.support.constraint.Guideline
+        android:id="@+id/checkbox_guide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_begin="32dp"/>
+
+    <android.support.constraint.Guideline
+        android:id="@+id/description_guide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_begin="72dp"/>
+
+    <android.support.constraint.Guideline
+        android:id="@+id/reads_guide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_end="32dp"/>
 
 </android.support.constraint.ConstraintLayout>

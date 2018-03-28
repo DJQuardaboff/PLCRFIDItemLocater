@@ -297,9 +297,7 @@ public class InventoryActivity extends AppCompatActivity {
             mutedCheckbox = itemView.findViewById(R.id.is_muted_checkbox);
             mutedCheckbox.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) {
-                    tag.isMuted = mutedCheckbox.isChecked();
-                }
+                public void onClick(View v) { tag.isMuted = mutedCheckbox.isChecked(); }
             });
             readsTextView = itemView.findViewById(R.id.reads_text_view);
         }
