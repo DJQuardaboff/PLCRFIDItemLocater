@@ -5,4 +5,5 @@
     <string name="mute_label_text">Mute</string>
     <string name="description_label_text">Description</string>
     <string name="reads_label_text">Reads</string>
+    <string name="menu_item_refresh_list">Refresh list</string>
 </resources>

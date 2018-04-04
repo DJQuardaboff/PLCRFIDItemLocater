@@ -1,16 +1,31 @@
 package com.porterlee.rfiditemlocater;
 
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.FileObserver;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.os.EnvironmentCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -25,9 +40,14 @@ import com.alien.rfid.RFIDReader;
 import com.alien.rfid.ReaderException;
 import com.alien.rfid.Tag;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.LineNumberReader;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.Timer;
@@ -37,11 +57,20 @@ import java.util.regex.Pattern;
 import me.zhanghai.android.materialprogressbar.MaterialProgressBar;
 
 public class InventoryActivity extends AppCompatActivity {
-    private static final String FILE_PATH = "storage/sdcard0/PLCRFID/itemlocater/";
+    private static final String TAG = InventoryActivity.class.getName();
+    private static final String TARGET_LIST = "target_list";
+    private static final File FILE_PATH = new File(Environment.getExternalStorageDirectory(), "PLCRFID/itemlocater/");
+    private static final File INPUT_FILE = new File(FILE_PATH, "targets.txt");
+    private static final File INPUT_FILE_NEW = new File(FILE_PATH, "targets.new");
+    private static final File INPUT_FILE_OLD = new File(FILE_PATH, "targets.old");
+    private static final int BEEP_LENGH = 50;
+    //private FileObserver mFileObserver;
+    private AlertDialog refreshDialog;
     private RFIDReader reader;
+    private Menu mOptionsMenu;
     //private SimpleAdapter targetListAdapter;
     private RecyclerView.Adapter<RFIDItemViewHolder> targetRecyclerAdapter;
-    private ArrayList<RFIDTag> targets = new ArrayList<>();
+    private ArrayList<RFIDTag> targets;
     private int topRSSIIndex = -1;
     private boolean playAudio = false;
     private Timer timer = new Timer();
@@ -49,10 +78,10 @@ public class InventoryActivity extends AppCompatActivity {
     private TimerTask playTone = new TimerTask() {
         @Override
         public void run() {
-            if(playAudio && topRSSIIndex >= 0 && !targets.get(topRSSIIndex).isMuted) {
+            if (playAudio && topRSSIIndex >= 0 && !targets.get(topRSSIIndex).isMuted) {
                 double progress = (targets.get(topRSSIIndex).rssi + 75) / .4;
                 progress = (progress > 100) ? 100 : ((progress < 0) ? 0 : progress);
-                generateTone((progress * 5) + 500, 50).play();
+                generateTone((progress * 5) + 500).play();
             }
             playAudio = false;
         }
@@ -69,6 +98,16 @@ public class InventoryActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_inventory);
 
+        if (getSupportActionBar() != null)
+            getSupportActionBar().setTitle(String.format("%1s v%2s", getString(R.string.app_name), BuildConfig.VERSION_NAME));
+
+        targets = savedInstanceState != null ? savedInstanceState.<RFIDTag>getParcelableArrayList(TARGET_LIST) : null;
+        if (targets == null)
+            targets = new ArrayList<>();
+        init();
+    }
+
+    private void init() {
         final RecyclerView targetsRecyclerView = findViewById(R.id.target_recycler_view);
         targetsRecyclerView.setHasFixedSize(true);
         targetsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -97,29 +136,76 @@ public class InventoryActivity extends AppCompatActivity {
         });
         timer.scheduleAtFixedRate(playTone, 0, 100);
         setTargets();
+
+        /*mFileObserver = new FileObserver(FILE_PATH.getAbsolutePath()) {
+            @Override
+            public void onEvent(int event, @Nullable String path) {
+                Log.d(TAG, "onEvent() | int event = "  + Integer.toBinaryString(event));
+                if ((event & (FileObserver.CREATE | FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE | FileObserver.MODIFY)) != 0 && INPUT_FILE.exists()) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            askForRefresh();
+                        }
+                    });
+                }
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        refreshFileMenuOption();
+                    }
+                });
+            }
+        };*/
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelableArrayList(TARGET_LIST, targets);
     }
 
     private boolean tryInitReader() {
         try {
-            // initialize RFID interface and obtain a global RFID Reader instance
             reader = RFID.open();
         } catch(ReaderException e) {
+            e.printStackTrace();
             Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
         } catch (Throwable e) {
+            e.printStackTrace();
             Toast.makeText(this, "This device is not supported", Toast.LENGTH_SHORT).show();
-        } finally {
-            if (reader == null) {
-                //noinspection ReturnInsideFinallyBlock
-                return false;
-            }
         }
 
+        return reader != null;
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        mOptionsMenu = menu;
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.inventory_menu, menu);
+        //refreshFileMenuOption();
         return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.action_refresh_list:
+                if (!isShared(INPUT_FILE))
+                    askForRefresh();
+                else
+                    Toast.makeText(this, "USB mass storage must be turned off first", Toast.LENGTH_SHORT).show();
+                return true;
+        }
+
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        //mFileObserver.startWatching();
         if (!tryInitReader()) {
             finish();
             //return;
@@ -129,8 +215,11 @@ public class InventoryActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        reader.close();
-        reader = null;
+        //mFileObserver.stopWatching();
+        if (reader != null) {
+            reader.close();
+            reader = null;
+        }
     }
 
     @Override
@@ -153,8 +242,41 @@ public class InventoryActivity extends AppCompatActivity {
         return super.onKeyUp(keyCode, event);
     }
 
-    private void startScan() {
+    private void askForRefresh() {
+        if (refreshDialog == null) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Refresh List");
+            builder.setMessage("Would you like to refresh the list?");
+            builder.setNegativeButton("no", null);
+            builder.setPositiveButton("yes", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    setTargets();
+                }
+            });
+            refreshDialog = builder.create();
+        }
 
+        refreshDialog.show();
+    }
+
+    /*private void refreshFileMenuOption() {
+        if (mOptionsMenu != null)
+            mOptionsMenu.findItem(R.id.action_refresh_list).setEnabled(INPUT_FILE.exists());
+    }*/
+
+    private void refreshExternalPath() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+            Uri contentUri = Uri.fromFile(FILE_PATH);
+            mediaScanIntent.setData(contentUri);
+            sendBroadcast(mediaScanIntent);
+        } else {
+            sendBroadcast(new Intent(Intent.ACTION_MEDIA_MOUNTED, Uri.fromFile(FILE_PATH)));
+        }
+    }
+
+    private void startScan() {
         if (reader == null || reader.isRunning()) return;
 
         try {
@@ -195,69 +317,93 @@ public class InventoryActivity extends AppCompatActivity {
     }
 
     private void setTargets() {
-        File temp1 = new File(FILE_PATH + "targets.new");
-        if(temp1.delete() || !temp1.exists()) {
+        refreshExternalPath();
+        if(INPUT_FILE_NEW.delete() || !INPUT_FILE_NEW.exists()) {
+            targetRecyclerAdapter.notifyItemRangeRemoved(0, targets.size());
             targets.clear();
-            Scanner fileIn;
+            LineNumberReader fileIn = null;
 
             try {
-                fileIn = new Scanner(new File(FILE_PATH + "targets.txt"));
+                fileIn = new LineNumberReader(new FileReader(INPUT_FILE));
                 String[] buffer;
 
-                while (fileIn.hasNextLine()) {
-                    buffer = fileIn.nextLine().split(Pattern.quote(","));
-                    addTarget(buffer[0], buffer[1]);
+                String line;
+                while ((line = fileIn.readLine()) != null) {
+                    buffer = line.split(Pattern.quote(","));
+                    try {
+                        String epc = buffer[0];
+                        String description = buffer[1];
+                        targetRecyclerAdapter.notifyItemInserted(targets.size());
+                        targets.add(new RFIDTag(epc, description, -75));
+                    } catch (ArrayIndexOutOfBoundsException e) {
+                        throw new ParseException("Not enough tokens", fileIn.getLineNumber());
+                    }
                 }
 
                 if (targets.size() > 0) {
                     Toast.makeText(this, "Targets set", Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(this, "No targets set", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "No targets set", Toast.LENGTH_LONG).show();
                 }
 
                 try {
-                    File temp2 = new File(FILE_PATH + "targets.old");
-                    if (!temp2.createNewFile() && !temp2.exists())
-                        Toast.makeText(this, "Could not create targets.old", Toast.LENGTH_SHORT).show();
+                    if (!INPUT_FILE_OLD.createNewFile() && !INPUT_FILE_OLD.exists())
+                        Toast.makeText(this, "Could not create targets.old", Toast.LENGTH_LONG).show();
                 } catch (IOException e) {
-                    Toast.makeText(this, "Could not create targets.old", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Could not create targets.old", Toast.LENGTH_LONG).show();
                     e.printStackTrace();
                 }
             } catch (FileNotFoundException e) {
-                Toast.makeText(this, "Could not read target file", Toast.LENGTH_SHORT).show();
                 e.printStackTrace();
+                if (isShared(INPUT_FILE))
+                    Toast.makeText(this, "Turn off USB mass storage first", Toast.LENGTH_SHORT).show();
+                else
+                    Toast.makeText(this, "Could not read target file", Toast.LENGTH_LONG).show();
+            } catch (ParseException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Target file formatted incorrectly: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            } catch (IOException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "An IOException occured: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            } finally {
+                if (fileIn != null) {
+                    try {
+                        fileIn.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
+        } else {
+            Toast.makeText(this, "Could not delete targets.new", Toast.LENGTH_LONG).show();
         }
     }
 
+    public boolean isShared(File file) {
+        return EnvironmentCompat.getStorageState(file).equals(Environment.MEDIA_SHARED);
+    }
+
     public void toggleGeiger() {
-        if (reader.isRunning()) {
+        if (reader != null && reader.isRunning()) {
             stopScan();
         } else {
             startScan();
         }
     }
 
-    private AudioTrack generateTone(double freqHz, int durationMs) {
-        int count = (int)(44100.0 * 2.0 * (durationMs / 1000.0)) & ~1;
+    private AudioTrack generateTone(double freqHz) {
+        int count = (int)(44100.0 * 2.0 * (BEEP_LENGH / 1000.0)) & ~1;
         short[] samples = new short[count];
+
         for(int i = 0; i < count; i += 2){
             short sample = (short)(Math.sin(2 * Math.PI * i / (44100.0 / freqHz)) * 0x7FFF);
             samples[i] = sample;
             samples[i + 1] = sample;
         }
+
         AudioTrack track = new AudioTrack(AudioManager.STREAM_MUSIC, 44100, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT, count * (Short.SIZE / 8), AudioTrack.MODE_STATIC);
         track.write(samples, 0, count);
         return track;
-    }
-
-    public void addTarget(String epc, String description) {
-        RFIDTag tag = new RFIDTag();
-        tag.epc = epc;
-        tag.description = description;
-        tag.reads = 0;
-        tag.rssi = -75d;
-        targets.add(tag);
     }
 
     public void onRead(final String epc, final double rssi) {
@@ -265,7 +411,9 @@ public class InventoryActivity extends AppCompatActivity {
             if (epc.equals(targets.get(i).epc)) {
                 targets.get(i).reads += 1;
                 targets.get(i).rssi = rssi;
-                playAudio = true;
+                if (!targets.get(i).isMuted) {
+                    playAudio = true;
+                }
                 if (topRSSIIndex >= 0) {
                     if ((i == topRSSIIndex || rssi > targets.get(topRSSIIndex).rssi) && !targets.get(i).isMuted) {
                         topRSSIIndex = i;
@@ -311,11 +459,53 @@ public class InventoryActivity extends AppCompatActivity {
         }
     }
 
-    public class RFIDTag {
+    public static class RFIDTag implements Parcelable{
         String epc;
         String description;
         int reads;
         double rssi;
         boolean isMuted;
+
+        RFIDTag(String epc, String description, double rssi) {
+            this.epc = epc;
+            this.description = description;
+            this.reads = 0;
+            this.rssi = rssi;
+            this.isMuted = false;
+        }
+
+        RFIDTag(Parcel in) {
+            epc = in.readString();
+            description = in.readString();
+            reads = in.readInt();
+            rssi = in.readDouble();
+            isMuted = in.readByte() != 0;
+        }
+
+        public static final Creator<RFIDTag> CREATOR = new Creator<RFIDTag>() {
+            @Override
+            public RFIDTag createFromParcel(Parcel in) {
+                return new RFIDTag(in);
+            }
+
+            @Override
+            public RFIDTag[] newArray(int size) {
+                return new RFIDTag[size];
+            }
+        };
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeString(epc);
+            dest.writeString(description);
+            dest.writeInt(reads);
+            dest.writeDouble(rssi);
+            dest.writeByte((byte) (isMuted ? 1 : 0));
+        }
     }
 }
